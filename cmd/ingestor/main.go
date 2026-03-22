@@ -17,6 +17,7 @@ func main() {
 
 	ctx := context.Background()
 	consumer := broker.NewKafkaConsumer(BrokerAddress, KafkaTopic, "trades-clickhouse-ingestor")
+	producer := broker.NewKafkaProducer(BrokerAddress, KafkaTopic)
 	repo := database.NewClickHouseRepo(ClickHouseAddress)
 
 	err := broker.PrepareKafkaTopic(BrokerAddress, KafkaTopic)
@@ -26,7 +27,7 @@ func main() {
 
 	// Websocket connections are blocking
 	go func() {
-		err := exchange.StreamBinanceTrades("BTCUSDT")
+		err := exchange.StreamBinanceTrades("BTCUSDT", producer)
 		if err != nil {
 			log.Fatalf("Stream stopped: %v", err)
 		}

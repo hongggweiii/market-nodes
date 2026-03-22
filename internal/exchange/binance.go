@@ -6,10 +6,11 @@ import (
 	"strings"
 
 	"github.com/gorilla/websocket"
+	"github.com/hongggweiii/market-feed/internal/broker"
 	"github.com/hongggweiii/market-feed/internal/domain"
 )
 
-func StreamBinanceTrades(symbol string) error {
+func StreamBinanceTrades(symbol string, broker *broker.KafkaProducer) error {
 	baseUrl := "wss://stream.binance.com:9443/ws"
 	lowercaseSymbol := strings.ToLower(symbol)
 	websocketUrl := fmt.Sprintf("%s/%s@trade", baseUrl, lowercaseSymbol)
@@ -37,7 +38,12 @@ func StreamBinanceTrades(symbol string) error {
 			continue
 		}
 
-		fmt.Println("Parsed trade details:", trade)
+		err = broker.PublishTrade(*trade)
+		if err != nil {
+			fmt.Printf("Error while publishing trade: %v", err)
+		}
+
+		fmt.Println("Published trade:", trade)
 	}
 
 	return nil
