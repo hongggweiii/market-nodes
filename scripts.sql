@@ -10,3 +10,6 @@ CREATE TABLE IF NOT EXISTS trades (
     is_market_maker Bool NOT NULL
 ) ENGINE = MergeTree()
 ORDER BY (symbol, trade_time, trade_id)
+
+-- Modify quantity column to Decimal
+ALTER TABLE trades MODIFY COLUMN quantity Decimal(18, 8)
