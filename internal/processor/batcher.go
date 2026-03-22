@@ -6,15 +6,11 @@ import (
 	"time"
 
 	"github.com/hongggweiii/market-feed/internal/broker"
+	"github.com/hongggweiii/market-feed/internal/database"
 	"github.com/hongggweiii/market-feed/internal/domain"
 )
 
-func insertBatch(batch []domain.Trade) error {
-	fmt.Printf("Flushing batch of size %d to ClickHouse...", len(batch))
-	return nil
-}
-
-func StartBatchingEngine(consumer *broker.KafkaConsumer, ctx context.Context) error {
+func StartBatchingEngine(ctx context.Context, consumer *broker.KafkaConsumer, repo *database.ClickHouseRepo) error {
 	// Channel to pass trades between threads
 	tradeChan := make(chan domain.Trade, 1000)
 
@@ -39,7 +35,7 @@ func StartBatchingEngine(consumer *broker.KafkaConsumer, ctx context.Context) er
 		case trade := <-tradeChan: // Append trade to batch
 			batch = append(batch, trade)
 			if len(batch) >= 1000 {
-				err := insertBatch(batch)
+				err := repo.InsertTrades(ctx, batch)
 				if err != nil {
 					fmt.Printf("Error while inserting batch to ClickHouse: %v", err)
 				}
@@ -47,7 +43,7 @@ func StartBatchingEngine(consumer *broker.KafkaConsumer, ctx context.Context) er
 			}
 		case <-ticker.C: // Insert existing batch to database every 2s
 			if len(batch) > 0 {
-				err := insertBatch(batch)
+				err := repo.InsertTrades(ctx, batch)
 				if err != nil {
 					fmt.Printf("Error while inserting batch to ClickHouse: %v", err)
 				}
