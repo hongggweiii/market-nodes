@@ -9,10 +9,10 @@ import (
 	// Blank import to run init() in the background for src and dest file paths
 	_ "github.com/golang-migrate/migrate/v4/database/clickhouse"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/hongggweiii/market-feed/internal/broker"
-	"github.com/hongggweiii/market-feed/internal/database"
 	"github.com/hongggweiii/market-feed/internal/exchange"
-	"github.com/hongggweiii/market-feed/internal/processor"
+	"github.com/hongggweiii/market-feed/internal/ingestor/broker"
+	"github.com/hongggweiii/market-feed/internal/ingestor/database"
+	"github.com/hongggweiii/market-feed/internal/ingestor/processor"
 	"github.com/joho/godotenv"
 )
 

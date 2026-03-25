@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hongggweiii/market-feed/internal/broker"
-	"github.com/hongggweiii/market-feed/internal/database"
 	"github.com/hongggweiii/market-feed/internal/domain"
+	"github.com/hongggweiii/market-feed/internal/ingestor/broker"
+	"github.com/hongggweiii/market-feed/internal/ingestor/database"
 )
 
 func StartBatchingEngine(ctx context.Context, consumer *broker.KafkaConsumer, repo *database.ClickHouseRepo) error {

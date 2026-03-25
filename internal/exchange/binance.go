@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/gorilla/websocket"
-	"github.com/hongggweiii/market-feed/internal/broker"
 	"github.com/hongggweiii/market-feed/internal/domain"
+	"github.com/hongggweiii/market-feed/internal/ingestor/broker"
 )
 
 func StreamBinanceTrades(symbol string, broker *broker.KafkaProducer) error {
