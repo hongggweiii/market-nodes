@@ -3,7 +3,6 @@ package exchange
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -25,17 +24,15 @@ func FetchDepthSnapshot(symbol string) (*domain.DepthSnapshot, error) {
 
 	orderBook := new(domain.DepthSnapshot)
 	if resp.StatusCode == http.StatusOK {
-		bodyBytes, err := io.ReadAll(resp.Body)
-		if err != nil {
-			fmt.Printf("Error reading from response body: %v", err)
+		// io.ReadAll() take sup lots of memory
+		if err := json.NewDecoder(resp.Body).Decode(orderBook); err != nil {
+			return nil, fmt.Errorf("Failed to decode response: %w", err)
 		}
-
-		err = json.Unmarshal(bodyBytes, orderBook)
-		fmt.Println("Successful fetch!")
 	} else {
 		return nil, fmt.Errorf("Request failed with status: %d", resp.StatusCode)
 
 	}
 
+	fmt.Println("Successful fetch!")
 	return orderBook, nil
 }
