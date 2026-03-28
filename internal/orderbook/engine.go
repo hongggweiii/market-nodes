@@ -1,6 +1,7 @@
 package orderbook
 
 import (
+	"fmt"
 	"maps"
 	"slices"
 	"sync"
@@ -10,9 +11,11 @@ import (
 )
 
 type OrderBook struct {
-	mu   sync.RWMutex // Allow multiple reads but only 1 writes
-	bids map[decimal.Decimal]decimal.Decimal
-	asks map[decimal.Decimal]decimal.Decimal
+	mu              sync.RWMutex // Allow multiple reads but only 1 writes
+	bids            map[decimal.Decimal]decimal.Decimal
+	asks            map[decimal.Decimal]decimal.Decimal
+	lastProcessedID int64
+	isSynced        bool
 }
 
 func NewOrderBook() *OrderBook {
@@ -55,12 +58,34 @@ func (b *OrderBook) Seed(snapshot *domain.DepthSnapshot) {
 		quantity := ask[1]
 		b.asks[price] = quantity
 	}
+
+	// Ensure we only process updates that come after the snapshot
+	b.lastProcessedID = snapshot.LastUpdateID
+	b.isSynced = false
 }
 
 // ProcessUpdate applies a depth update to the order book, updating or deleting levels
-func (b *OrderBook) ProcessUpdate(update *domain.DepthUpdate) {
+func (b *OrderBook) ProcessUpdate(update *domain.DepthUpdate) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+
+	if update.FinalUpdateID <= b.lastProcessedID {
+		return nil // Skip old updates
+	}
+
+	// If we receive an update that is the next in sequence, process it and mark lastProcessedID
+	if !b.isSynced {
+		if update.FirstUpdateID <= b.lastProcessedID+1 && update.FinalUpdateID >= b.lastProcessedID+1 {
+			b.isSynced = true
+		} else {
+			return nil // Message is too new, not synced yet, skip it
+		}
+	} else {
+		// Runs for all subsequent updates after we are synced, ensures in sync and in order
+		if update.FirstUpdateID != b.lastProcessedID+1 {
+			return fmt.Errorf("Sequence gap detected: expected %d, got %d", b.lastProcessedID+1, update.FirstUpdateID)
+		}
+	}
 
 	for _, bid := range update.Bids {
 		price := bid[0]
@@ -81,6 +106,10 @@ func (b *OrderBook) ProcessUpdate(update *domain.DepthUpdate) {
 			b.updateLevelUnsafe("ASK", price, quantity)
 		}
 	}
+
+	b.lastProcessedID = update.FinalUpdateID
+
+	return nil
 }
 
 // Unsafe versions of the update and delete functions that assume the caller has already acquired the necessary locks
