@@ -32,6 +32,7 @@ type binanceDepthUpdateDTO struct {
 	Asks          [][]decimal.Decimal `json:"a"`
 }
 
+// StreamBinanceTrades streams trades for a given symbol and publishes them to the provided Kafka producer
 func StreamBinanceTrades(symbol string, broker *broker.KafkaProducer) error {
 	baseUrl := "wss://stream.binance.com:9443/ws"
 	lowercaseSymbol := strings.ToLower(symbol)
@@ -82,7 +83,8 @@ func StreamBinanceTrades(symbol string, broker *broker.KafkaProducer) error {
 	return nil
 }
 
-func StreamOrderBookDepthUpdates(symbol string) error {
+// StreamOrderBookDepthUpdates streams depth updates for a given symbol and sends them to the channel
+func StreamOrderBookDepthUpdates(symbol string, updates chan<- *domain.DepthUpdate) error {
 	baseUrl := "wss://stream.binance.com:9443/ws"
 	lowercaseSymbol := strings.ToLower(symbol)
 	websocketUrl := fmt.Sprintf("%s/%s@depth", baseUrl, lowercaseSymbol)
@@ -120,7 +122,7 @@ func StreamOrderBookDepthUpdates(symbol string) error {
 			Asks:          dto.Asks,
 		}
 
-		fmt.Println("Depth update: \n\n", update)
+		updates <- update
 	}
 
 	return nil

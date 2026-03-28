@@ -1,6 +1,8 @@
 package orderbook
 
 import (
+	"maps"
+	"slices"
 	"sync"
 
 	"github.com/hongggweiii/market-feed/internal/domain"
@@ -102,6 +104,35 @@ func (b *OrderBook) deleteLevelUnsafe(side string, price decimal.Decimal) error 
 	}
 
 	return nil
+}
+
+// getTopBook returns the best bid and ask price and quantity for the current order book state
+func (b *OrderBook) GetTopBook() (decimal.Decimal, decimal.Decimal, decimal.Decimal, decimal.Decimal) {
+	bids := b.GetBids()
+	asks := b.GetAsks()
+
+	bidPrices := slices.Collect(maps.Keys(bids))
+	askPrices := slices.Collect(maps.Keys(asks))
+
+	var bestBidPrice, bestBidQty, bestAskPrice, bestAskQty decimal.Decimal
+
+	if len(bidPrices) > 0 {
+		slices.SortFunc(bidPrices, func(a, b decimal.Decimal) int {
+			return b.Cmp(a)
+		})
+		bestBidPrice = bidPrices[0]
+		bestBidQty = bids[bestBidPrice]
+	}
+
+	if len(askPrices) > 0 {
+		slices.SortFunc(askPrices, func(a, b decimal.Decimal) int {
+			return a.Cmp(b)
+		})
+		bestAskPrice = askPrices[0]
+		bestAskQty = asks[bestAskPrice]
+	}
+
+	return bestBidPrice, bestBidQty, bestAskPrice, bestAskQty
 }
 
 // GetBids and GetAsks return copies of the current order book state to prevent external modification
