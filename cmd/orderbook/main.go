@@ -13,16 +13,7 @@ func main() {
 	engine := orderbook.NewOrderBook()
 
 	// Channel to receive depth updates from Websocket
-	updates := make(chan *domain.DepthUpdate, 100)
-
-	snapshot, err := exchange.FetchDepthSnapshot("BTCUSDT")
-	if err != nil {
-		log.Fatalf("Failed to fetch order book: %v", err)
-	}
-
-	engine.Seed(snapshot)
-
-	log.Printf("Bids: %d, Asks: %d", len(engine.GetBids()), len(engine.GetAsks()))
+	updates := make(chan *domain.DepthUpdate, 1000)
 
 	go func() {
 		err := exchange.StreamOrderBookDepthUpdates("BTCUSDT", updates)
@@ -30,6 +21,16 @@ func main() {
 			log.Fatalf("Stream stopped: %v", err)
 		}
 	}()
+
+	log.Println("Websocket started...")
+
+	snapshot, err := exchange.FetchDepthSnapshot("BTCUSDT")
+	if err != nil {
+		log.Fatalf("Failed to fetch order book: %v", err)
+	}
+
+	engine.Seed(snapshot)
+	log.Printf("Engine seeded! Bids: %d, Asks: %d", len(engine.GetBids()), len(engine.GetAsks()))
 
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
