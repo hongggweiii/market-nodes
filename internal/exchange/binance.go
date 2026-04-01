@@ -3,6 +3,7 @@ package exchange
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/gorilla/websocket"
@@ -10,6 +11,8 @@ import (
 	"github.com/hongggweiii/market-feed/internal/ingestor/broker"
 	"github.com/shopspring/decimal"
 )
+
+type BinanceClient struct{}
 
 type binanceTradeDTO struct {
 	EventType     string          `json:"e"`
@@ -33,7 +36,7 @@ type binanceDepthUpdateDTO struct {
 }
 
 // StreamBinanceTrades streams trades for a given symbol and publishes them to the provided Kafka producer
-func StreamBinanceTrades(symbol string, broker *broker.KafkaProducer) error {
+func (c *BinanceClient) StreamBinanceTrades(symbol string, broker *broker.KafkaProducer) error {
 	baseUrl := "wss://stream.binance.com:9443/ws"
 	lowercaseSymbol := strings.ToLower(symbol)
 	websocketUrl := fmt.Sprintf("%s/%s@trade", baseUrl, lowercaseSymbol)
@@ -83,8 +86,49 @@ func StreamBinanceTrades(symbol string, broker *broker.KafkaProducer) error {
 	return nil
 }
 
+type binanceDepthSnapshotDTO struct {
+	LastUpdateID int64               `json:"lastUpdateId"`
+	Bids         [][]decimal.Decimal `json:"bids"`
+	Asks         [][]decimal.Decimal `json:"asks"`
+}
+
+func (c *BinanceClient) FetchDepthSnapshot(symbol string) (*domain.DepthSnapshot, error) {
+	const limit = 1000
+	baseUrl := "https://api.binance.com"
+	lowercaseSymbol := strings.ToUpper(symbol)
+	restUrl := fmt.Sprintf("%s/api/v3/depth?symbol=%s&limit=%d", baseUrl, lowercaseSymbol, limit)
+
+	resp, err := http.Get(restUrl)
+	if err != nil {
+		fmt.Println("Error fetching depth:", err)
+		return nil, err
+	}
+	defer resp.Body.Close() // Prevent resource leaks
+
+	dto := new(binanceDepthSnapshotDTO)
+	if resp.StatusCode == http.StatusOK {
+		// io.ReadAll() take sup lots of memory
+		if err := json.NewDecoder(resp.Body).Decode(dto); err != nil {
+			return nil, fmt.Errorf("Failed to decode response: %w", err)
+		}
+	} else {
+		return nil, fmt.Errorf("Request failed with status: %d", resp.StatusCode)
+
+	}
+
+	// Map DTO to Domain model
+	snapshot := &domain.DepthSnapshot{
+		LastUpdateID: dto.LastUpdateID,
+		Bids:         dto.Bids,
+		Asks:         dto.Asks,
+	}
+
+	fmt.Println("Successful fetch!")
+	return snapshot, nil
+}
+
 // StreamOrderBookDepthUpdates streams depth updates for a given symbol and sends them to the channel
-func StreamOrderBookDepthUpdates(symbol string, updates chan<- *domain.DepthUpdate) error {
+func (c *BinanceClient) StreamOrderBookDepthUpdates(symbol string, updates chan<- *domain.DepthUpdate) error {
 	baseUrl := "wss://stream.binance.com:9443/ws"
 	lowercaseSymbol := strings.ToLower(symbol)
 	websocketUrl := fmt.Sprintf("%s/%s@depth", baseUrl, lowercaseSymbol)

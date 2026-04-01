@@ -9,14 +9,14 @@ import (
 	"github.com/hongggweiii/market-feed/internal/orderbook"
 )
 
-func main() {
+func RunOrderBook(api orderbook.DepthProvider, symbol string) {
 	engine := orderbook.NewOrderBook()
 
 	// Channel to receive depth updates from Websocket
 	updates := make(chan *domain.DepthUpdate, 1000)
 
 	go func() {
-		err := exchange.StreamOrderBookDepthUpdates("BTCUSDT", updates)
+		err := api.StreamOrderBookDepthUpdates(symbol, updates)
 		if err != nil {
 			log.Fatalf("Stream stopped: %v", err)
 		}
@@ -24,7 +24,7 @@ func main() {
 
 	log.Println("Websocket started...")
 
-	snapshot, err := exchange.FetchDepthSnapshot("BTCUSDT")
+	snapshot, err := api.FetchDepthSnapshot(symbol)
 	if err != nil {
 		log.Fatalf("Failed to fetch order book: %v", err)
 	}
@@ -47,5 +47,12 @@ func main() {
 			log.Printf("Best Bid: %s (%s), Best Ask: %s (%s)", bestBidPrice, bestBidQty, bestAskPrice, bestAskQty)
 		}
 	}
+}
+
+func main() {
+	binanceAPI := &exchange.BinanceClient{}
+
+	log.Println("Starting order book...")
+	RunOrderBook(binanceAPI, "BTCUSDT")
 
 }

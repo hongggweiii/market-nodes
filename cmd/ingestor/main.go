@@ -16,6 +16,26 @@ import (
 	"github.com/joho/godotenv"
 )
 
+type TradeStreamer interface {
+	StreamBinanceTrades(symbol string, broker *broker.KafkaProducer) error
+}
+
+func RunIngestor(ctx context.Context, api TradeStreamer, producer *broker.KafkaProducer, consumer *broker.KafkaConsumer, repo *database.ClickHouseRepo, symbol string) {
+	// Websocket connections are blocking, so we run it in a separate goroutine
+	go func() {
+		err := api.StreamBinanceTrades(symbol, producer)
+		if err != nil {
+			log.Fatalf("Stream stopped: %v", err)
+		}
+	}()
+
+	// Starts the batching engine and blocks the main thread
+	err := processor.StartBatchingEngine(ctx, consumer, repo)
+	if err != nil {
+		log.Fatalf("Failed to start batching engine: %v", err)
+	}
+}
+
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -26,11 +46,6 @@ func main() {
 	var BrokerAddress = os.Getenv("KAFKA_BROKER")
 	const KafkaTopic = "crypto.trades.raw"
 	var ClickHouseAddress = os.Getenv("CLICKHOUSE_ADDR")
-
-	ctx := context.Background()
-	consumer := broker.NewKafkaConsumer(BrokerAddress, KafkaTopic, "trades-clickhouse-ingestor")
-	producer := broker.NewKafkaProducer(BrokerAddress, KafkaTopic)
-	repo := database.NewClickHouseRepo(ClickHouseAddress)
 
 	// Saves resources and prevents deadlocks
 	if os.Getenv("RUN_MIGRATIONS") == "true" {
@@ -55,16 +70,12 @@ func main() {
 		log.Fatalf("Failed to create Kafka topic: %v", err)
 	}
 
-	// Websocket connections are blocking
-	go func() {
-		err := exchange.StreamBinanceTrades("BTCUSDT", producer)
-		if err != nil {
-			log.Fatalf("Stream stopped: %v", err)
-		}
-	}()
+	ctx := context.Background()
+	consumer := broker.NewKafkaConsumer(BrokerAddress, KafkaTopic, "trades-clickhouse-ingestor")
+	producer := broker.NewKafkaProducer(BrokerAddress, KafkaTopic)
+	repo := database.NewClickHouseRepo(ClickHouseAddress)
+	binanceAPI := &exchange.BinanceClient{}
 
-	err = processor.StartBatchingEngine(ctx, consumer, repo)
-	if err != nil {
-		log.Fatalf("Failed to start batching engine: %v", err)
-	}
+	log.Println("Booting Ingestor...")
+	RunIngestor(ctx, binanceAPI, producer, consumer, repo, "BTCUSDT")
 }

@@ -10,6 +10,12 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// Order Book interface
+type DepthProvider interface {
+	StreamOrderBookDepthUpdates(symbol string, updates chan<- *domain.DepthUpdate) error
+	FetchDepthSnapshot(symbol string) (*domain.DepthSnapshot, error)
+}
+
 type OrderBook struct {
 	mu              sync.RWMutex // Allow multiple reads but only 1 writes
 	bids            map[decimal.Decimal]decimal.Decimal
