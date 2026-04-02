@@ -50,9 +50,11 @@ func RunOrderBook(api orderbook.DepthProvider, symbol string) {
 }
 
 func main() {
-	binanceAPI := &exchange.BinanceClient{}
+	// binanceAPI := &exchange.BinanceClient{}
+	coinbaseAPI := &exchange.CoinbaseClient{}
 
 	log.Println("Starting order book...")
-	RunOrderBook(binanceAPI, "BTCUSDT")
+	// RunOrderBook(binanceAPI, "BTCUSDT")
+	RunOrderBook(coinbaseAPI, "BTC-USD")
 
 }

@@ -75,6 +75,12 @@ func (b *OrderBook) ProcessUpdate(update *domain.DepthUpdate) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	// Coinbase doesn't provide update IDs or sequence, so we treat all updates as new and apply them directly
+	if update.FirstUpdateID == 0 && update.FinalUpdateID == 0 {
+		b.applyUpdatesToMaps(update.Bids, update.Asks)
+		return nil
+	}
+
 	if update.FinalUpdateID <= b.lastProcessedID {
 		return nil // Skip old updates
 	}
@@ -93,23 +99,29 @@ func (b *OrderBook) ProcessUpdate(update *domain.DepthUpdate) error {
 		}
 	}
 
-	for _, bid := range update.Bids {
-		price := bid[0]
-		quantity := bid[1]
+	// Apply the updates to bids
+	for price, quantity := range update.Bids {
+		priceDecimal, err := decimal.NewFromString(price)
+		if err != nil {
+			continue
+		}
 		if quantity.IsZero() {
-			b.deleteLevelUnsafe("BID", price)
+			b.deleteLevelUnsafe("BID", priceDecimal)
 		} else {
-			b.updateLevelUnsafe("BID", price, quantity)
+			b.updateLevelUnsafe("BID", priceDecimal, quantity)
 		}
 	}
 
-	for _, ask := range update.Asks {
-		price := ask[0]
-		quantity := ask[1]
+	// Apply the updates to asks
+	for price, quantity := range update.Asks {
+		priceDecimal, err := decimal.NewFromString(price)
+		if err != nil {
+			continue
+		}
 		if quantity.IsZero() {
-			b.deleteLevelUnsafe("ASK", price)
+			b.deleteLevelUnsafe("ASK", priceDecimal)
 		} else {
-			b.updateLevelUnsafe("ASK", price, quantity)
+			b.updateLevelUnsafe("ASK", priceDecimal, quantity)
 		}
 	}
 
@@ -193,4 +205,31 @@ func (b *OrderBook) GetAsks() map[decimal.Decimal]decimal.Decimal {
 		copy[k] = v
 	}
 	return copy
+}
+
+// applyUpdatesToMaps is a helper function to apply updates directly to the maps, used only for Coinbase
+func (b *OrderBook) applyUpdatesToMaps(bids map[string]decimal.Decimal, asks map[string]decimal.Decimal) {
+	for price, quantity := range bids {
+		priceDecimal, err := decimal.NewFromString(price)
+		if err != nil {
+			continue
+		}
+		if quantity.IsZero() {
+			b.deleteLevelUnsafe("BID", priceDecimal)
+		} else {
+			b.updateLevelUnsafe("BID", priceDecimal, quantity)
+		}
+	}
+
+	for price, quantity := range asks {
+		priceDecimal, err := decimal.NewFromString(price)
+		if err != nil {
+			continue
+		}
+		if quantity.IsZero() {
+			b.deleteLevelUnsafe("ASK", priceDecimal)
+		} else {
+			b.updateLevelUnsafe("ASK", priceDecimal, quantity)
+		}
+	}
 }

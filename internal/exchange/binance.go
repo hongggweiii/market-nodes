@@ -14,6 +14,12 @@ import (
 
 type BinanceClient struct{}
 
+type binanceDepthSnapshotDTO struct {
+	LastUpdateID int64               `json:"lastUpdateId"`
+	Bids         [][]decimal.Decimal `json:"bids"`
+	Asks         [][]decimal.Decimal `json:"asks"`
+}
+
 type binanceTradeDTO struct {
 	EventType     string          `json:"e"`
 	EventTime     int64           `json:"E"`
@@ -86,12 +92,7 @@ func (c *BinanceClient) StreamBinanceTrades(symbol string, broker *broker.KafkaP
 	return nil
 }
 
-type binanceDepthSnapshotDTO struct {
-	LastUpdateID int64               `json:"lastUpdateId"`
-	Bids         [][]decimal.Decimal `json:"bids"`
-	Asks         [][]decimal.Decimal `json:"asks"`
-}
-
+// FetchDepthSnapshot fetches the current order book snapshot for a given symbol
 func (c *BinanceClient) FetchDepthSnapshot(symbol string) (*domain.DepthSnapshot, error) {
 	const limit = 1000
 	baseUrl := "https://api.binance.com"
@@ -113,7 +114,6 @@ func (c *BinanceClient) FetchDepthSnapshot(symbol string) (*domain.DepthSnapshot
 		}
 	} else {
 		return nil, fmt.Errorf("Request failed with status: %d", resp.StatusCode)
-
 	}
 
 	// Map DTO to Domain model
@@ -141,6 +141,8 @@ func (c *BinanceClient) StreamOrderBookDepthUpdates(symbol string, updates chan<
 	}
 	defer conn.Close()
 
+	fmt.Printf("[Binance] Connected and subscribed to %s", symbol)
+
 	// Infinite loop for Websocket
 	for {
 		_, p, err := conn.ReadMessage()
@@ -162,8 +164,21 @@ func (c *BinanceClient) StreamOrderBookDepthUpdates(symbol string, updates chan<
 			Symbol:        dto.Symbol,
 			FirstUpdateID: dto.FirstUpdateID,
 			FinalUpdateID: dto.FinalUpdateID,
-			Bids:          dto.Bids,
-			Asks:          dto.Asks,
+			Bids:          make(map[string]decimal.Decimal),
+			Asks:          make(map[string]decimal.Decimal),
+		}
+
+		// Populate the Bids and Asks maps
+		for _, bid := range dto.Bids {
+			priceStr := bid[0].String() // Convert the price decimal to a string key
+			quantity := bid[1]
+			update.Bids[priceStr] = quantity
+		}
+
+		for _, ask := range dto.Asks {
+			priceStr := ask[0].String()
+			quantity := ask[1]
+			update.Asks[priceStr] = quantity
 		}
 
 		updates <- update
