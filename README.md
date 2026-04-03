@@ -6,6 +6,7 @@ Market Nodes is a comprehensive backend engineering project which serves as a le
 
 1. **The Ingestor**
 2. **The Order Book**
+3. **The Arbitrage Detector**
 
 ---
 
@@ -95,4 +96,34 @@ go mod tidy
 ## Running Application
 ```bash
 go run cmd/orderbook/main.go
+```
+
+---
+
+## Microservice 3: Arbitrage Detector
+
+Functions as a gRPC client which continuously polls multiple exchange nodes simultaneously, calculates the exact cross-exchange spread, and logs profitable arbitrage pathways. 
+
+## Architecture Overview
+
+1. **Concurrent gRPC Clients:** Utilizes Protobuf clients to establish persistent HTTP/2 connections to the local Order Book servers. Allows for highly optimized, binary communication rather than relying on slow HTTP/JSON requests.
+2. **Synchronized Polling (`sync.WaitGroup`):** To eliminate sequential latency (where one exchange's price becomes outdated while waiting for the other)
+
+## Setup & Configuration
+
+**1. Clone the repository**
+```bash
+git clone [https://github.com/yourusername/market-nodes.git](https://github.com/yourusername/market-nodes.git)
+cd market-nodes
+```
+**2. Install Dependencies**
+```bash
+go mod tidy
+```
+
+## Running Application
+Run OrderBook first before running Arbitrage, since gRPC server is located in OrderBook
+```bash
+go run cmd/orderbook/main.go
+go run cmd/arbitrage/main.go
 ```
